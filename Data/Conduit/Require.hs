@@ -35,7 +35,7 @@ data RunMode = Reset -- ^ The requirement will be reset, and can be run multiple
 -- Each computation's output is `yield`ed downstream.
 --
 -- When all computations have been run, the conduit finishes processing.
-withRequirement :: (Ord identifier, Eq identifier, Monad m, Functor m, Show x, Show content, Show identifier, Show a)
+withRequirement :: (Ord identifier, Eq identifier, Monad m, Functor m)
                 => [(RunMode, Require identifier content x)] -- ^ The list of dependent computations
                 -> (a -> identifier)              -- ^ Extracting the identifier
                 -> (a -> m content)               -- ^ Extracting the content, possibly with effects
@@ -44,7 +44,7 @@ withRequirement computations getIdentifier getContent = run getIdentifier getCon
     where
         compmap = [ (rm, req, []) | (rm, req) <- computations ]
 
-run :: (Ord identifier, Eq identifier, Monad m, Functor m, Show a, Show x, Show content, Show identifier)
+run :: (Ord identifier, Eq identifier, Monad m, Functor m)
     => (a -> identifier)
     -> (a -> m content)
     -> [(RunMode, Require identifier content x, [(identifier, content)])]
