@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                withdependencies
-version:             0.1.1
+version:             0.2.0
 synopsis:            Run computations that depend on one or more elements in a stream.
 -- description:         
 license:             GPL-3
@@ -27,3 +27,11 @@ library
                        mtl
   -- hs-source-dirs:      
   default-language:    Haskell2010
+
+test-suite test
+    hs-source-dirs:    tests
+    ghc-options:       -Wall
+    type:              exitcode-stdio-1.0
+    main-is:           test.hs
+    build-depends:     withdependencies,base,hspec,HUnit,conduit,mtl
+    default-language:  Haskell2010
