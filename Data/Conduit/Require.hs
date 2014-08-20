@@ -24,15 +24,19 @@ import Data.Monoid
 import Control.Monad
 import Control.Monad.Trans
 
+-- | This allows the user to parameter what happends once a requirement is
+-- fulfilled.
+data RunMode = Reset -- ^ The requirement will be reset, and can be run multiple times
+             | Once -- ^ The requirement can only run once
+
 -- | Given a stream of values, from which an identifier and a content can
 -- be extracted, runs a list of computation that depend on these.
 --
--- Each computation can only be run once, and its output is `yield`ed
--- downstream.
+-- Each computation's output is `yield`ed downstream.
 --
 -- When all computations have been run, the conduit finishes processing.
 withRequirement :: (Ord identifier, Eq identifier, Monad m)
-                => [Require identifier content x] -- ^ The list of dependent computations
+                => [(RunMode, Require identifier content x)] -- ^ The list of dependent computations
                 -> (a -> identifier)              -- ^ Extracting the identifier
                 -> (a -> m content)               -- ^ Extracting the content, possibly with effects
                 -> Conduit a m x
@@ -40,12 +44,12 @@ withRequirement computations getIdentifier getContent = run compmap imap getIden
     where
         compmap = M.fromList (zip [0..] computations)
         imap = M.fromListWith (++) $ do
-            (n, c) <- M.toList compmap
+            (n, (_, c)) <- M.toList compmap
             i <- getIdentifiers c
             return (i, [n])
 
 run :: (Ord identifier, Eq identifier, Monad m)
-    => M.Map Int (Require identifier content x)
+    => M.Map Int (RunMode, Require identifier content x)
     -> M.Map identifier [Int]
     -> (a -> identifier)
     -> (a -> m content)
@@ -64,8 +68,14 @@ run compmap imap getIdentifier getContent curmap = do
                             extractedContent <- getContent i
                             let ncnt  = M.insert ident extractedContent cnt
                                 nmap  = M.insert cid ncnt cmap
-                            return $ case M.lookup cid compmap >>= computeRequire ncnt of
-                                         Just v -> (M.delete cid cmap, v : ccomp)
+                                lk = do
+                                    (rm, req) <- M.lookup cid compmap
+                                    v <- computeRequire ncnt req
+                                    return (rm, v)
+                            return $ case lk of
+                                         Just (rm, v) -> case rm of
+                                                             Once -> (M.delete cid cmap, v : ccomp)
+                                                             Reset -> (M.insert cid mempty cmap, v: ccomp)
                                          Nothing -> (nmap, ccomp)
                         Nothing -> return (cmap, ccomp) -- this should not happen !
             (newmap, comps) <- lift (foldM checkComputation (curmap, []) matchedComputations)
