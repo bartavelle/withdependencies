@@ -24,7 +24,7 @@ import qualified Data.Foldable as F
 -- of named parameters (the "identifier"), that are linked to a "content",
 -- and that will yield a result of type "a".
 data Require identifier content a where
-    Require :: (identifier -> Bool) -> Require identifier content content
+    Require :: (identifier -> Bool) -> Require identifier content (identifier, content)
     Pure    :: a                    -> Require identifier content a
     Ap      :: Require identifier content (a -> b) -> Require identifier content a -> Require identifier content b
     Alt     :: Require identifier content a -> Require identifier content a -> Require identifier content a
@@ -43,9 +43,9 @@ instance Alternative (Require identifier content) where
 
 -- | This operator let you "require" a value in a computation.
 require :: Eq identifier => identifier -> Require identifier content content
-require = Require . (==)
+require = fmap snd . Require . (==)
 
-requireFilter :: (identifier -> Bool) -> Require identifier content content
+requireFilter :: (identifier -> Bool) -> Require identifier content (identifier, content)
 requireFilter = Require
 
 -- | Evaluate a computation, given a map of key/values for possible
@@ -58,7 +58,7 @@ computeRequire _ Empty       = empty
 computeRequire _ (Pure x)    = pure x
 computeRequire s (Require i) = case filter ( i . fst ) s of
                                    []    -> empty
-                                   (_,x):_ -> pure x
+                                   x:_ -> pure x
 computeRequire s (Ap r1 r2)  = computeRequire s r1 <*> computeRequire s r2
 computeRequire s (Alt r1 r2) = computeRequire s r1 <|> computeRequire s r2
 
