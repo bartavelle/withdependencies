@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                withdependencies
-version:             0.2.2.1
+version:             0.2.3
 synopsis:            Run computations that depend on one or more elements in a stream.
 -- description:         
 license:             GPL-3
@@ -24,7 +24,7 @@ library
   ghc-options:         -Wall
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.7 && <4.9,
+  build-depends:       base >=4.7 && <4.10,
                        containers == 0.5.*,
                        conduit == 1.2.*,
                        mtl
