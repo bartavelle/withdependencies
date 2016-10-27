@@ -14,7 +14,13 @@
 -- > > computeRequire (M.fromList [("a", 12), ("c", 15)]) computation :: Maybe Int
 -- > Nothing
 --
-module Control.Dependency (Require, require, requireFilter, computeRequire, isComputable, triggersAnalyzer) where
+module Control.Dependency ( Require
+                          , require
+                          , requireFilter
+                          , computeRequire
+                          , isComputable
+                          , triggersAnalyzer
+                          ) where
 
 import Control.Applicative
 import qualified Data.Set as S
