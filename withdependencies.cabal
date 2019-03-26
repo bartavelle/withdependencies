@@ -4,7 +4,7 @@
 name:                withdependencies
 version:             0.2.4.2
 synopsis:            Run computations that depend on one or more elements in a stream.
-description:         Run computations that depend on one or more elements in a stream.
+description:         Run computations that depend on one or more elements in a stream. It lets you model dependencies as an applicative functor.
 license:             GPL-3
 license-file:        LICENSE
 author:              Simon Marechal
