@@ -7,7 +7,7 @@ Runs computations depending on some values coming from a conduit. The computatio
 > test = inp =$ cnd $$ CL.consume
 >     where
 >         inp = sourceDirectory "/etc"
->         cnd :: Conduit String IO Int
+>         cnd :: ConduitT String Int IO ()
 >         cnd = withRequirement (map Once comps) id (fmap length . readFile)
 >         comps :: [Require String Int Int]
 >         comps = [ (+) <$> require "/etc/passwd" <*> require "/etc/passwd"
@@ -39,7 +39,7 @@ withRequirement :: (Ord identifier, Eq identifier, Monad m, Functor m)
                 => [(RunMode, Require identifier content x)] -- ^ The list of dependent computations
                 -> (a -> identifier)              -- ^ Extracting the identifier
                 -> (a -> m content)               -- ^ Extracting the content, possibly with effects
-                -> Conduit a m x
+                -> ConduitT a x m ()
 withRequirement computations getIdentifier getContent = run getIdentifier getContent compmap
     where
         compmap = [ (rm, req, []) | (rm, req) <- computations ]
@@ -48,7 +48,7 @@ run :: (Ord identifier, Eq identifier, Monad m, Functor m)
     => (a -> identifier)
     -> (a -> m content)
     -> [(RunMode, Require identifier content x, [(identifier, content)])]
-    -> Conduit a m x
+    -> ConduitT a x m ()
 run getIdentifier getContent computationList = do
     mi <- await
     case mi of

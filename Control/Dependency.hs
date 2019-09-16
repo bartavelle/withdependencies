@@ -18,12 +18,14 @@
 module Control.Dependency ( Require
                           , require
                           , requireFilter
+                          , guardResult
                           , computeRequire
                           , isComputable
                           , triggersAnalyzer
                           ) where
 
 import Control.Applicative
+import Control.Monad (guard)
 import qualified Data.Set as S
 import qualified Data.Foldable as F
 import Data.Profunctor
@@ -38,6 +40,7 @@ data Require identifier content a where
     Alt          :: Require identifier content a -> Require identifier content a -> Require identifier content a
     Empty        :: Require identifier content a
     HoistContent :: (content -> prevcontent) -> Require identifier prevcontent a -> Require identifier content a
+    GuardResult  :: (a -> Bool) -> Require identifier content a -> Require identifier content a
 
 instance Functor (Require identifier content) where
     fmap f = Ap (Pure f)
@@ -60,9 +63,16 @@ require = fmap snd . Require . (==)
 requireFilter :: (identifier -> Bool) -> Require identifier content (identifier, content)
 requireFilter = Require
 
+-- | Will drop the result unless the predicate is true.
+guardResult
+  :: (result -> Bool) -- ^ predicate
+  -> Require identifier content result
+  -> Require identifier content result
+guardResult = GuardResult
+
 -- | Evaluate a computation, given a map of key/values for possible
 -- parameters.
-computeRequire :: (Ord identifier, Eq identifier, Applicative f, Alternative f)
+computeRequire :: (Ord identifier, Eq identifier, Monad f, Alternative f)
                => [(identifier, content)]
                -> Require identifier content a
                -> f a
@@ -74,6 +84,9 @@ computeRequire s (Require i) = case filter ( i . fst ) s of
 computeRequire s (Ap r1 r2)  = computeRequire s r1 <*> computeRequire s r2
 computeRequire s (Alt r1 r2) = computeRequire s r1 <|> computeRequire s r2
 computeRequire s (HoistContent f r) = computeRequire (map (\(i,c) -> (i, f c)) s) r
+computeRequire s (GuardResult f r) = do
+    r' <- computeRequire s r
+    r' <$ guard (f r')
 
 -- | Checks if a computation can be completed given a set of known identifiers.
 isComputable :: (Ord identifier, Eq identifier)
@@ -86,6 +99,7 @@ isComputable s (Require i) = F.any i s
 isComputable s (Ap r1 r2)  = isComputable s r1 && isComputable s r2
 isComputable s (Alt r1 r2) = isComputable s r1 || isComputable s r2
 isComputable s (HoistContent _ f) = isComputable s f
+isComputable s (GuardResult _ r) = isComputable s r
 
 triggersAnalyzer :: identifier -> Require identifier content a -> Bool
 triggersAnalyzer _ Empty = False
@@ -94,3 +108,4 @@ triggersAnalyzer s (Require i) = i s
 triggersAnalyzer s (Ap r1 r2) = triggersAnalyzer s r1 || triggersAnalyzer s r2
 triggersAnalyzer s (Alt r1 r2) = triggersAnalyzer s r1 || triggersAnalyzer s r2
 triggersAnalyzer s (HoistContent _ f) = triggersAnalyzer s f
+triggersAnalyzer s (GuardResult _ r) = triggersAnalyzer s r
