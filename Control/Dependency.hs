@@ -1,5 +1,5 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs               #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -- | This module is a glorified wrapper over `Data.Map.Strict.lookup`. It
 -- let you define computations in an applicative way that "require" some
 -- optional values, defined by an identifier.
@@ -20,15 +20,16 @@ module Control.Dependency ( Require
                           , requireFilter
                           , guardResult
                           , computeRequire
+                          , computeRequireIntermediate
                           , isComputable
                           , triggersAnalyzer
                           ) where
 
-import Control.Applicative
-import Control.Monad (guard)
-import qualified Data.Set as S
-import qualified Data.Foldable as F
-import Data.Profunctor
+import           Control.Applicative
+import           Control.Monad       (guard)
+import qualified Data.Foldable       as F
+import           Data.Profunctor
+import qualified Data.Set            as S
 
 -- | The main data type, used to model a computation that requires a list
 -- of named parameters (the "identifier"), that are linked to a "content",
@@ -70,33 +71,69 @@ guardResult
   -> Require identifier content result
 guardResult = GuardResult
 
+data ComputeMode
+    = Intermediate
+    | Final
+    deriving (Show, Eq, Ord, Enum, Bounded)
+
 -- | Evaluate a computation, given a map of key/values for possible
 -- parameters.
-computeRequire :: (Ord identifier, Eq identifier, Monad f, Alternative f)
-               => [(identifier, content)]
-               -> Require identifier content a
-               -> f a
-computeRequire _ Empty       = empty
-computeRequire _ (Pure x)    = pure x
-computeRequire s (Require i) = case filter ( i . fst ) s of
-                                   []    -> empty
-                                   x:_ -> pure x
-computeRequire s (Ap r1 r2)  = computeRequire s r1 <*> computeRequire s r2
-computeRequire s (Alt r1 r2) = computeRequire s r1 <|> computeRequire s r2
-computeRequire s (HoistContent f r) = computeRequire (map (\(i,c) -> (i, f c)) s) r
-computeRequire s (GuardResult f r) = do
-    r' <- computeRequire s r
-    r' <$ guard (f r')
+computeRequire
+  :: forall identifier content f a.
+     (Ord identifier, Eq identifier, Monad f, Alternative f)
+  => [(identifier, content)]
+  -> Require identifier content a
+  -> f a
+computeRequire = computeRequireG Final
+
+-- | Evaluate a computation, given a map of key/values for possible
+-- parameters. Returns an empty result when alternatives are present and
+-- the first choice failed.
+computeRequireIntermediate
+  :: forall identifier content f a.
+     (Ord identifier, Eq identifier, Monad f, Alternative f)
+  => [(identifier, content)]
+  -> Require identifier content a
+  -> f a
+computeRequireIntermediate = computeRequireG Intermediate
+
+computeRequireG
+  :: forall identifier content f a.
+     (Ord identifier, Eq identifier, Monad f, Alternative f)
+  => ComputeMode
+  -> [(identifier, content)]
+  -> Require identifier content a
+  -> f a
+computeRequireG mode s = go
+  where
+    go :: forall x. Require identifier content x -> f x
+    go rq =
+      case rq of
+        Empty -> empty
+        Pure x -> pure x
+        Require i ->
+          case filter (i . fst) s of
+            [] -> empty
+            x:_ -> pure x
+        Ap r1 r2 -> go r1 <*> go r2
+        Alt r1 r2 ->
+          case mode of
+            Intermediate -> go r1
+            Final -> go r1 <|> go r2
+        HoistContent f r -> computeRequireG mode (map (fmap f) s) r
+        GuardResult f r -> do
+          r' <- go r
+          r' <$ guard (f r')
 
 -- | Checks if a computation can be completed given a set of known identifiers.
 isComputable :: (Ord identifier, Eq identifier)
              => S.Set identifier
              -> Require identifier content a
              -> Bool
-isComputable _ Empty       = False
-isComputable _ (Pure _)    = True
+isComputable _ Empty = False
+isComputable _ (Pure _) = True
 isComputable s (Require i) = F.any i s
-isComputable s (Ap r1 r2)  = isComputable s r1 && isComputable s r2
+isComputable s (Ap r1 r2) = isComputable s r1 && isComputable s r2
 isComputable s (Alt r1 r2) = isComputable s r1 || isComputable s r2
 isComputable s (HoistContent _ f) = isComputable s f
 isComputable s (GuardResult _ r) = isComputable s r

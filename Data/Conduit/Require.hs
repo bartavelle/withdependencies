@@ -1,5 +1,4 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 {- |
 Runs computations depending on some values coming from a conduit. The computations are defined in applicative fashion.
 
@@ -25,9 +24,11 @@ import Control.Monad.Trans
 
 -- | This allows the user to parameter what happends once a requirement is
 -- fulfilled.
-data RunMode = Reset -- ^ The requirement will be reset, and can be run multiple times
-             | Once -- ^ The requirement can only run once
-             deriving Show
+data RunMode
+   = Reset -- ^ The requirement will be reset, and can be run multiple times
+   | Once -- ^ The requirement can only run once, first answer is kept on alts
+   | OnceCorrect -- ^ The requirement can only run once, best answer is kept on alts
+   deriving Show
 
 -- | Given a stream of values, from which an identifier and a content can
 -- be extracted, runs a list of computation that depend on these.
@@ -52,17 +53,35 @@ run :: (Ord identifier, Eq identifier, Monad m, Functor m)
 run getIdentifier getContent computationList = do
     mi <- await
     case mi of
-        Nothing -> return ()
+        Nothing ->
+          let lastPass (runmode, req, contents) =
+                case runmode of
+                  OnceCorrect ->
+                    case computeRequire contents req of
+                      Just rs -> yield rs
+                      Nothing -> pure ()
+                  _ -> pure ()
+          in  mapM_ lastPass computationList
+
         Just streamElement -> do
             let ident = getIdentifier streamElement
                 tryComputeReq nc (runmode, req, contents) =
                     let previouscomputation = [(runmode, req, ncontents)]
                         droppedcontent = [(runmode, req, [])]
                         ncontents = (ident, nc) : contents
-                    in  case (computeRequire ncontents req, runmode) of
-                            (Just rs, Once)  -> ([], [rs])
-                            (Just rs, Reset) -> (droppedcontent, [rs])
-                            (Nothing, _)     -> (previouscomputation, [])
+                    in  case runmode of
+                          Once ->
+                            case computeRequire ncontents req of
+                              Just rs -> ([], [rs])
+                              Nothing -> (previouscomputation, [])
+                          Reset ->
+                            case computeRequire ncontents req of
+                              Just rs -> (droppedcontent, [rs])
+                              Nothing -> (previouscomputation, [])
+                          OnceCorrect ->
+                            case computeRequireIntermediate ncontents req of
+                              Just rs -> ([], [rs])
+                              Nothing -> (previouscomputation, [])
                 checkComputation (curCompList, curResults, curContent) requirement@(_,req,_) =
                     if triggersAnalyzer ident req
                         then do
