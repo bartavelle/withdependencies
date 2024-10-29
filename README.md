@@ -1,6 +1,6 @@
 # withdependencies
 
-[![Build Status](https://travis-ci.org/bartavelle/withdependencies.svg?branch=master)](https://travis-ci.org/bartavelle/withdependencies)
+[![Haskell-CI](https://github.com/bartavelle/withdependencies/actions/workflows/haskell-ci.yml/badge.svg)](https://github.com/bartavelle/withdependencies/actions/workflows/haskell-ci.yml)
 
 Model computation with dependencies, and evaluate them over streams of elements.
 
