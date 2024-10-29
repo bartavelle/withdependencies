@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                withdependencies
-version:             0.3.0
+version:             0.3.1
 synopsis:            Run computations that depend on one or more elements in a stream.
 description:         Run computations that depend on one or more elements in a stream. It lets you model dependencies as an applicative functor.
 license:             GPL-3
@@ -17,7 +17,7 @@ category:            Control
 build-type:          Simple
 -- extra-source-files:  
 cabal-version:       >=1.10
-Tested-With:         GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.4, GHC == 8.6.5, GHC == 8.8.1
+Tested-With:         GHC == 9.6.6 || == 9.8.2 || == 9.10.1
 
 library
   exposed-modules:     Control.Dependency
@@ -26,7 +26,7 @@ library
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.7 && < 5,
-                       containers >= 0.5 && < 0.7,
+                       containers >= 0.5 && < 0.8,
                        conduit >= 1.2 && < 1.4,
                        mtl,
                        profunctors
